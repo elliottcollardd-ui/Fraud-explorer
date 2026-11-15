@@ -30,20 +30,27 @@ Logistic regression, trained on the earliest 70% of transactions (199,364 rows, 
 ## What I found
 
 - **ROC-AUC is misleading here.** It reads 0.979 while only 5.4% of flags at the default threshold are real fraud. With 0.17% fraud, PR-AUC and the precision/recall table are the honest measures.
-- **Caught fraud clusters; missed fraud doesn't.** At a 0.95 threshold, the 89 frauds the model catches form one tight group. The 19 it misses are scattered individually among normal transactions, so they look legitimate on these features and a threshold change alone won't recover them.
-
-TODO (Elliott): rotate the view and confirm the second point holds from several angles. Add anything you found when you clicked the three missed frauds that sit together.
+- **Caught fraud clusters; missed fraud doesn't.** At a 0.95 threshold, the 89 frauds the model catches appear in the 3D view as one tight group. The 19 it misses appear scattered individually among normal transactions, so they look legitimate on these features and a threshold change alone won't recover them.
 
 ## Why I made these choices
 
-TODO (Elliott): write each of these in your own words, two or three sentences each. These are the interview questions.
+**Why split by time instead of randomly?**
+A real fraud model is trained on past transactions and used on future ones, so I trained on the earliest 70% and tested on the latest 30%. A random split mixes future transactions into the training data, which lets the model preview the test period and makes the results look better than they would be in real use.
 
-- Why split by time instead of randomly?
-- Why `class_weight="balanced"`?
-- Why log-transform `Amount`?
-- Why PR-AUC over accuracy or ROC-AUC?
-- Why keep all fraud but only sample 5,000 normal transactions for the 3D view?
-- What does UMAP preserve, and what does it distort?
+**Why `class_weight="balanced"`?**
+Fraud is only 0.17% of rows, so an unweighted model can reach 99.8% accuracy by calling everything normal. Balanced weighting makes each fraud example count about 500 times more than a normal one during training, so missing fraud becomes expensive. The cost is more false alarms, which is why precision is only 5.4% at the default 0.5 threshold.
+
+**Why log-transform `Amount`?**
+Most transactions are small and a few are very large. Logistic regression treats each feature linearly, so a handful of huge amounts would dominate. Taking log(1 + amount) compresses the range: £10 becomes 2.4, £1,000 becomes 6.9 and £10,000 becomes 9.2. The "+1" keeps £0 transactions valid.
+
+**Why PR-AUC over accuracy or ROC-AUC?**
+Accuracy is useless here because predicting "normal" every time scores 99.8%. ROC-AUC measures false alarms as a share of all normal transactions, and with 85,335 of those, 1,673 false alarms is only 2%, so it looks excellent (0.979). Precision asks what share of flags are real fraud, which was 5.4%. PR-AUC (0.751) summarises precision and recall across all thresholds, so it reflects what a fraud team would experience.
+
+**Why keep all fraud but only sample 5,000 normal transactions for the 3D view?**
+The test set has 85,443 transactions, which is slow to embed and too many points to read in a browser, and the 108 frauds would be lost among them. The frauds are what I'm studying, so I kept all of them and sampled the normal ones as background. The cost is that the view shows fewer false alarms than really exist, so I report metrics from the full test set, not from the view.
+
+**What does UMAP preserve, and what does it distort?**
+UMAP reduces the 30 features to 3 coordinates. It mostly preserves neighbourhoods: transactions that are similar across all 30 features stay close together. It distorts the distances between clusters and their size and density, and the layout changes with its settings. So I use it to decide what to inspect, not as proof.
 
 ## Run it
 
